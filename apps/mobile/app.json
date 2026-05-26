@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Subfreq",
+    "slug": "subfreq",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.subfreq.app",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["soundcloud"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#000000"
+      },
+      "package": "com.subfreq.app",
+      "intentFilters": [
+        {
+          "action": "android.intent.action.VIEW",
+          "data": [{ "scheme": "soundcloud" }],
+          "category": ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"]
+        }
+      ]
+    },
+    "plugins": ["expo-router", "expo-av"],
+    "scheme": "subfreq",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
