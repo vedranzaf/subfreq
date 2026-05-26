@@ -1,215 +1,460 @@
+'use client';
+
+import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Review } from '@/lib/types';
 
-const GENRES = ['Electronic', 'Techno', 'Drum & Bass', 'Ambient', 'Hip-Hop', 'Footwork', 'Jungle', 'Experimental'];
+const API = 'https://subfreq-wine.vercel.app/api';
 
-function formatCue(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
+interface Track {
+  soundcloud_id: string;
+  title: string;
+  artist: string;
+  artwork_url: string | null;
+  soundcloud_url: string;
+  duration_ms: number;
+}
+
+interface Reviewer {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+}
+
+interface Review {
+  id: string;
+  created_at: string;
+  body: string;
+  cue_seconds: number | null;
+  background_video_url: string | null;
+  upvote_count: number;
+  comment_count: number;
+  has_upvoted: boolean;
+  reviewer: Reviewer;
+  track: Track;
+}
+
+function formatCue(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, '0')}`;
 }
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const h = Math.floor(diff / 3600000);
-  if (h < 1) return 'just now';
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 30) return `${d}d ago`;
-  return `${Math.floor(d / 30)}mo ago`;
+  if (h < 1) return 'now';
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
 }
 
-function ReviewCard({ review }: { review: Review }) {
-  const artwork = review.track.artwork_url?.replace('-large', '-t300x300');
-  const hue = parseInt(review.id.slice(-6), 16) % 360;
+function hueFromStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffff;
+  return h % 360;
+}
+
+function ReviewSlide({ review, isActive }: { review: Review; isActive: boolean }) {
+  const hue = hueFromStr(review.id);
+  const artwork = review.track.artwork_url?.replace('-large', '-t300x300') ?? null;
+  const [upvoted, setUpvoted] = useState(review.has_upvoted);
+  const [upvotes, setUpvotes] = useState(review.upvote_count);
+  const [bodyExpanded, setBodyExpanded] = useState(false);
+
+  const handleUpvote = () => {
+    setUpvoted(v => !v);
+    setUpvotes(v => upvoted ? v - 1 : v + 1);
+  };
 
   return (
-    <article style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 16,
+    <div style={{
+      width: '100%',
+      height: '100%',
+      position: 'relative',
+      flexShrink: 0,
       overflow: 'hidden',
-      display: 'flex',
-      flexDirection: 'column',
+      background: '#111',
     }}>
-      {/* Artwork / header */}
-      <div style={{
-        height: 160,
-        background: artwork
-          ? `url(${artwork}) center/cover`
-          : `linear-gradient(135deg, hsl(${hue},40%,8%) 0%, hsl(${(hue+60)%360},40%,14%) 100%)`,
-        position: 'relative',
-      }}>
-        {review.background_video_url && (
-          <div style={{
-            position: 'absolute', bottom: 10, right: 10,
-            background: 'rgba(0,0,0,0.6)', borderRadius: 6,
-            padding: '3px 8px', fontSize: 11, fontWeight: 600,
-          }}>
-            🎬 video review
-          </div>
-        )}
+      {/* Background artwork */}
+      {artwork ? (
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.8) 100%)',
+          backgroundImage: `url(${artwork})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          filter: 'blur(40px) brightness(0.35) saturate(1.4)',
+          transform: 'scale(1.1)',
         }} />
-        {/* Track info overlay */}
+      ) : (
         <div style={{
-          position: 'absolute', bottom: 12, left: 12, right: 12,
-          display: 'flex', alignItems: 'center', gap: 8,
+          position: 'absolute', inset: 0,
+          background: `linear-gradient(160deg, hsl(${hue},35%,8%) 0%, hsl(${(hue+80)%360},35%,14%) 100%)`,
+        }} />
+      )}
+
+      {/* Artwork as centered image */}
+      {artwork && (
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -65%)',
+          width: 220, height: 220,
+          borderRadius: 16,
+          backgroundImage: `url(${artwork})`,
+          backgroundSize: 'cover',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
+          opacity: isActive ? 1 : 0.7,
+          transition: 'opacity 0.4s',
+          zIndex: 2,
+        }} />
+      )}
+
+      {/* Bottom gradient */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: '65%',
+        background: 'linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.7) 50%, transparent 100%)',
+        zIndex: 3,
+      }} />
+
+      {/* Top gradient (for status bar area) */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0,
+        height: 80,
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)',
+        zIndex: 3,
+      }} />
+
+      {/* Top bar */}
+      <div style={{
+        position: 'absolute', top: 40, left: 0, right: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 10, padding: '0 20px',
+      }}>
+        <Link href="/" style={{
+          color: 'rgba(255,255,255,0.9)',
+          fontSize: 18, fontWeight: 800, letterSpacing: '-0.03em',
         }}>
-          <span style={{ fontSize: 16, color: 'var(--orange)' }}>♫</span>
-          <a
-            href={review.track.soundcloud_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: 12, fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          >
-            {review.track.artist} — {review.track.title}
-          </a>
+          sub<span style={{ color: '#ff5500' }}>freq</span>
+        </Link>
+      </div>
+
+      {/* Side actions */}
+      <div style={{
+        position: 'absolute', right: 14, bottom: 120,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22,
+        zIndex: 10,
+      }}>
+        {/* Reviewer avatar */}
+        <div style={{ position: 'relative', marginBottom: 4 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: '50%',
+            background: review.reviewer.avatar_url
+              ? `url(${review.reviewer.avatar_url}) center/cover`
+              : `linear-gradient(135deg, hsl(${hueFromStr(review.reviewer.username)},50%,20%), hsl(${(hueFromStr(review.reviewer.username)+60)%360},50%,28%))`,
+            border: '2px solid #fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 16, fontWeight: 700,
+            color: `hsl(${hueFromStr(review.reviewer.username)},70%,75%)`,
+          }}>
+            {!review.reviewer.avatar_url && review.reviewer.username[0].toUpperCase()}
+          </div>
+          <div style={{
+            position: 'absolute', bottom: -8, left: '50%', transform: 'translateX(-50%)',
+            width: 20, height: 20, borderRadius: '50%',
+            background: '#ff5500',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 12, color: '#fff', fontWeight: 900,
+          }}>+</div>
+        </div>
+
+        {/* Upvote */}
+        <button onClick={handleUpvote} style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+          color: upvoted ? '#ff5500' : '#fff',
+          transition: 'color 0.15s, transform 0.1s',
+          transform: upvoted ? 'scale(1.15)' : 'scale(1)',
+        }}>
+          <span style={{ fontSize: 28, lineHeight: 1 }}>▲</span>
+          <span style={{ fontSize: 12, fontWeight: 700 }}>{upvotes >= 1000 ? `${(upvotes/1000).toFixed(1)}k` : upvotes}</span>
+        </button>
+
+        {/* Comments */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 26, lineHeight: 1 }}>💬</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{review.comment_count}</span>
+        </div>
+
+        {/* Share */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 24, lineHeight: 1 }}>🔗</span>
+        </div>
+
+        {/* Genre disc */}
+        <div style={{
+          width: 44, height: 44, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #1a1a1a, #333)',
+          border: '2px solid rgba(255,255,255,0.15)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 20,
+          animation: isActive ? 'spin 4s linear infinite' : 'none',
+        }}>
+          ♫
         </div>
       </div>
 
-      {/* Body */}
-      <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Bottom content */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 72,
+        padding: '0 16px 32px',
+        zIndex: 10,
+      }}>
         {/* Reviewer */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: '50%',
-            background: `hsl(${hue},50%,18%)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 13, fontWeight: 700, color: `hsl(${hue},70%,65%)`,
-            flexShrink: 0,
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <Link href={`/profile/${review.reviewer.username}`} style={{
+            fontSize: 15, fontWeight: 700, color: '#fff',
           }}>
-            {review.reviewer.username[0].toUpperCase()}
-          </div>
-          <Link href={`/profile/${review.reviewer.username}`}
-            style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
             @{review.reviewer.username}
           </Link>
-          <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>
-            {timeAgo(review.created_at)}
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>· {timeAgo(review.created_at)}</span>
+        </div>
+
+        {/* Track */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          background: 'rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: 10, padding: '8px 12px',
+          marginBottom: 10, border: '1px solid rgba(255,255,255,0.1)',
+        }}>
+          <span style={{ fontSize: 16, color: '#ff5500', flexShrink: 0 }}>♫</span>
+          <span style={{
+            fontSize: 12, fontWeight: 600, flex: 1,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {review.track.artist} — {review.track.title}
           </span>
+          {review.cue_seconds != null && (
+            <span style={{
+              fontSize: 11, fontWeight: 700, color: '#ff5500',
+              background: 'rgba(255,85,0,0.15)', padding: '2px 7px',
+              borderRadius: 100, flexShrink: 0,
+            }}>⚡{formatCue(review.cue_seconds)}</span>
+          )}
         </div>
 
         {/* Review body */}
-        <p style={{
-          fontSize: 14, color: 'rgba(255,255,255,0.82)', lineHeight: 1.65,
-          flex: 1,
-          display: '-webkit-box',
-          WebkitLineClamp: 4,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-        } as React.CSSProperties}>
+        <p
+          onClick={() => setBodyExpanded(v => !v)}
+          style={{
+            fontSize: 13, color: 'rgba(255,255,255,0.88)', lineHeight: 1.6,
+            marginBottom: 12, cursor: 'pointer',
+            display: '-webkit-box',
+            WebkitLineClamp: bodyExpanded ? undefined : 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: bodyExpanded ? 'visible' : 'hidden',
+          } as React.CSSProperties}
+        >
           {review.body}
+          {!bodyExpanded && <span style={{ color: 'rgba(255,255,255,0.4)' }}> more</span>}
         </p>
 
-        {/* Footer */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {review.cue_seconds != null && (
-            <span style={{
-              fontSize: 12, fontWeight: 700, color: 'var(--orange)',
-              background: 'var(--orange-dim)', padding: '3px 10px',
-              borderRadius: 100, border: '1px solid var(--orange-border)',
-            }}>
-              ⚡ {formatCue(review.cue_seconds)}
-            </span>
-          )}
-          <span style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 'auto' }}>
-            ▲ {review.upvote_count}
-          </span>
-          <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-            💬 {review.comment_count}
-          </span>
-          <a
-            href={review.track.soundcloud_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              background: 'var(--orange)', color: '#fff',
-              padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
-            }}
-          >
-            ▶ SoundCloud
-          </a>
-        </div>
+        {/* SoundCloud CTA */}
+        <a
+          href={review.track.soundcloud_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            background: '#ff5500', color: '#fff',
+            padding: '11px 0', borderRadius: 12,
+            fontSize: 13, fontWeight: 800, letterSpacing: '0.03em',
+            textDecoration: 'none',
+          }}
+        >
+          ▶ LISTEN ON SOUNDCLOUD
+        </a>
       </div>
-    </article>
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
+    </div>
   );
 }
 
-async function getFeedData(genre: string | null) {
-  const apiBase = process.env.API_URL ?? 'https://subfreq-wine.vercel.app';
-  const url = genre
-    ? `${apiBase}/api/feed?type=genre&genre=${encodeURIComponent(genre)}`
-    : `${apiBase}/api/feed?type=trending`;
-  try {
-    const res = await fetch(url, { next: { revalidate: 60 } });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.reviews ?? []) as Review[];
-  } catch {
-    return [];
-  }
-}
+export default function FeedPage() {
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [genre, setGenre] = useState<string | null>(null);
+  const [feedType, setFeedType] = useState<'trending' | 'genre'>('trending');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-export default async function FeedPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ genre?: string }>;
-}) {
-  const { genre } = await searchParams;
-  const reviews = await getFeedData(genre ?? null);
+  const loadFeed = useCallback(async (type: string, g?: string | null) => {
+    setLoading(true);
+    try {
+      const url = g
+        ? `${API}/feed?type=genre&genre=${encodeURIComponent(g)}`
+        : `${API}/feed?type=${type}&limit=20`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      setReviews(data.reviews ?? []);
+      setActiveIndex(0);
+      containerRef.current?.scrollTo({ top: 0 });
+    } catch {
+      setReviews([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadFeed('trending'); }, [loadFeed]);
+
+  // Track active slide via IntersectionObserver
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const idx = slideRefs.current.findIndex(r => r === entry.target);
+            if (idx !== -1) setActiveIndex(idx);
+          }
+        });
+      },
+      { root: containerRef.current, threshold: 0.6 },
+    );
+    slideRefs.current.forEach(r => r && observer.observe(r));
+    return () => observer.disconnect();
+  }, [reviews]);
+
+  const GENRES = ['Techno', 'Electronic', 'Drum & Bass', 'Ambient', 'Hip-Hop', 'Footwork'];
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 24px' }}>
-      {/* Header */}
-      <div style={{ marginBottom: 40 }}>
-        <h1 style={{ fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 800, letterSpacing: '-0.03em', marginBottom: 20 }}>
-          {genre ? `${genre} reviews` : 'Trending reviews'}
-        </h1>
-
-        {/* Genre pills */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Link href="/feed" style={{
-            padding: '7px 18px', borderRadius: 100, fontSize: 13, fontWeight: 600,
-            background: !genre ? 'var(--orange)' : 'var(--surface2)',
-            color: !genre ? '#fff' : 'var(--muted)',
-            border: `1px solid ${!genre ? 'var(--orange)' : 'var(--border)'}`,
-          }}>
-            Trending
-          </Link>
-          {GENRES.map((g) => (
-            <Link key={g} href={`/feed?genre=${encodeURIComponent(g)}`} style={{
-              padding: '7px 18px', borderRadius: 100, fontSize: 13, fontWeight: 600,
-              background: genre === g ? 'var(--orange)' : 'var(--surface2)',
-              color: genre === g ? '#fff' : 'var(--muted)',
-              border: `1px solid ${genre === g ? 'var(--orange)' : 'var(--border)'}`,
-            }}>
-              {g}
-            </Link>
-          ))}
-        </div>
+    <div style={{ width: '100%', height: '100%', position: 'relative', background: '#000' }}>
+      {/* Genre tabs */}
+      <div style={{
+        position: 'absolute', top: 44, left: 0, right: 0,
+        display: 'flex', gap: 0,
+        justifyContent: 'center',
+        zIndex: 20, padding: '0 60px',
+      }}>
+        <button
+          onClick={() => { setFeedType('trending'); setGenre(null); loadFeed('trending'); }}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: feedType === 'trending' && !genre ? '#fff' : 'rgba(255,255,255,0.45)',
+            fontWeight: feedType === 'trending' && !genre ? 700 : 500,
+            fontSize: 14, padding: '4px 12px',
+            borderBottom: feedType === 'trending' && !genre ? '2px solid #fff' : '2px solid transparent',
+          }}
+        >
+          Trending
+        </button>
+        <button
+          onClick={() => {
+            // cycle through genres
+            const next = GENRES[(GENRES.indexOf(genre ?? '') + 1) % GENRES.length];
+            setFeedType('genre'); setGenre(next); loadFeed('genre', next);
+          }}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: feedType === 'genre' ? '#fff' : 'rgba(255,255,255,0.45)',
+            fontWeight: feedType === 'genre' ? 700 : 500,
+            fontSize: 14, padding: '4px 12px',
+            borderBottom: feedType === 'genre' ? '2px solid #ff5500' : '2px solid transparent',
+          }}
+        >
+          {genre ?? 'Genres'}
+        </button>
       </div>
 
-      {/* Feed grid */}
-      {reviews.length === 0 ? (
+      {/* Genre picker drawer */}
+      {feedType === 'genre' && (
         <div style={{
-          textAlign: 'center', padding: '80px 24px',
-          color: 'var(--muted)', fontSize: 15,
+          position: 'absolute', top: 80, left: 12, right: 12,
+          display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center',
+          zIndex: 20,
         }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>♫</div>
-          <p style={{ marginBottom: 8 }}>No reviews yet{genre ? ` for ${genre}` : ''}.</p>
-          <p style={{ fontSize: 13 }}>Be the first to post one from the mobile app.</p>
+          {GENRES.map(g => (
+            <button key={g} onClick={() => { setGenre(g); loadFeed('genre', g); }} style={{
+              background: genre === g ? '#ff5500' : 'rgba(0,0,0,0.6)',
+              border: `1px solid ${genre === g ? '#ff5500' : 'rgba(255,255,255,0.2)'}`,
+              backdropFilter: 'blur(10px)',
+              color: '#fff', fontSize: 11, fontWeight: 600,
+              padding: '5px 12px', borderRadius: 100, cursor: 'pointer',
+            }}>
+              {g}
+            </button>
+          ))}
         </div>
-      ) : (
+      )}
+
+      {/* Scroll container */}
+      <div
+        ref={containerRef}
+        style={{
+          width: '100%', height: '100%',
+          overflowY: 'scroll',
+          scrollSnapType: 'y mandatory',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        } as React.CSSProperties}
+      >
+        <style>{`
+          div::-webkit-scrollbar { display: none; }
+        `}</style>
+
+        {loading ? (
+          <div style={{
+            width: '100%', height: '100%',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            color: 'rgba(255,255,255,0.4)', gap: 12,
+            scrollSnapAlign: 'start',
+          }}>
+            <div style={{ fontSize: 48 }}>♫</div>
+            <div style={{ fontSize: 14 }}>Loading...</div>
+          </div>
+        ) : reviews.length === 0 ? (
+          <div style={{
+            width: '100%', height: '100%',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            color: 'rgba(255,255,255,0.4)', gap: 12,
+            scrollSnapAlign: 'start',
+          }}>
+            <div style={{ fontSize: 48 }}>♫</div>
+            <div style={{ fontSize: 14 }}>No reviews yet for {genre ?? 'this feed'}</div>
+          </div>
+        ) : (
+          reviews.map((review, i) => (
+            <div
+              key={review.id}
+              ref={el => { slideRefs.current[i] = el; }}
+              style={{ width: '100%', height: '100%', scrollSnapAlign: 'start', flexShrink: 0 }}
+            >
+              <ReviewSlide review={review} isActive={i === activeIndex} />
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Progress dots */}
+      {reviews.length > 1 && (
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-          gap: 20,
+          position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+          display: 'flex', flexDirection: 'column', gap: 4, zIndex: 20,
         }}>
-          {reviews.map((review) => (
-            <ReviewCard key={review.id} review={review} />
+          {reviews.slice(0, 10).map((_, i) => (
+            <div key={i} style={{
+              width: 3, height: i === activeIndex ? 16 : 5,
+              borderRadius: 2,
+              background: i === activeIndex ? '#fff' : 'rgba(255,255,255,0.25)',
+              transition: 'height 0.2s, background 0.2s',
+            }} />
           ))}
         </div>
       )}
