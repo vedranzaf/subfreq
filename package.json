@@ -10,5 +10,8 @@
     "api": "npm run dev --workspace=apps/api",
     "mobile": "npm run start --workspace=apps/mobile",
     "web": "npm run dev --workspace=apps/web"
+  },
+  "dependencies": {
+    "react-dom": "^18.3.1"
   }
 }

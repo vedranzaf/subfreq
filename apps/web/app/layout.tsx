@@ -32,16 +32,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </span>
             </a>
             <nav style={{ display: 'flex', gap: 24, marginLeft: 'auto' }}>
-              <a href="/feed" style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 500, transition: 'color 0.15s' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}>
-                Trending
-              </a>
-              <a href="/feed?genre=Electronic" style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 500 }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}>
-                Genres
-              </a>
+              <a href="/feed" className="nav-link">Trending</a>
+              <a href="/feed?genre=Electronic" className="nav-link">Genres</a>
             </nav>
           </div>
         </header>
