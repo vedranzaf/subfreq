@@ -22,6 +22,9 @@ app.use('/api/feed', feedRouter);
 app.use('/api/reviews', reviewsRouter);
 app.use('/api/users', usersRouter);
 
-app.listen(PORT, () => {
-  console.log(`Subfreq API running on :${PORT}`);
-});
+// Local dev
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => console.log(`Subfreq API running on :${PORT}`));
+}
+
+export default app;
