@@ -3,10 +3,12 @@
   "private": true,
   "workspaces": [
     "apps/api",
-    "apps/mobile"
+    "apps/mobile",
+    "apps/web"
   ],
   "scripts": {
     "api": "npm run dev --workspace=apps/api",
-    "mobile": "npm run start --workspace=apps/mobile"
+    "mobile": "npm run start --workspace=apps/mobile",
+    "web": "npm run dev --workspace=apps/web"
   }
 }

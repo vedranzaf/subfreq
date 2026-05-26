@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import jwt from 'jsonwebtoken';
 import { db } from '../lib/supabase';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
@@ -12,7 +13,16 @@ const feedQuery = z.object({
   limit: z.coerce.number().min(1).max(50).default(20),
 });
 
-router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
+  // Soft auth: populate userId if token present, but don't require it for trending/genre
+  const header = req.headers.authorization;
+  if (header?.startsWith('Bearer ')) {
+    try {
+      const payload = jwt.verify(header.slice(7), process.env.JWT_SECRET!) as { sub: string };
+      req.userId = payload.sub;
+    } catch { /* ignore */ }
+  }
+
   const parsed = feedQuery.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -20,6 +30,11 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
   }
 
   const { type, genre, cursor, limit } = parsed.data;
+
+  if (type === 'following' && !req.userId) {
+    res.status(401).json({ error: 'Authentication required for following feed' });
+    return;
+  }
 
   let query = db
     .from('reviews')
