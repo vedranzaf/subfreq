@@ -5,6 +5,8 @@ import Link from 'next/link';
 
 const API = 'https://subfreq-wine.vercel.app/api';
 
+const GENRES = ['Techno', 'Electronic', 'Drum & Bass', 'Ambient', 'Hip-Hop', 'Footwork'];
+
 interface Track {
   soundcloud_id: string;
   title: string;
@@ -53,182 +55,207 @@ function hueFromStr(s: string): number {
   return h % 360;
 }
 
-function ReviewSlide({ review, isActive }: { review: Review; isActive: boolean }) {
+function ReviewSlide({
+  review,
+  isActive,
+}: {
+  review: Review;
+  isActive: boolean;
+}) {
   const hue = hueFromStr(review.id);
-  const artwork = review.track.artwork_url?.replace('-large', '-t300x300') ?? null;
+  const reviewerHue = hueFromStr(review.reviewer.username);
+  const artwork = review.track.artwork_url ?? null;
   const [upvoted, setUpvoted] = useState(review.has_upvoted);
   const [upvotes, setUpvotes] = useState(review.upvote_count);
   const [bodyExpanded, setBodyExpanded] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const handleUpvote = () => {
     setUpvoted(v => !v);
     setUpvotes(v => upvoted ? v - 1 : v + 1);
   };
 
+  const showImage = artwork && !imgError;
+
   return (
     <div style={{
       width: '100%',
       height: '100%',
       position: 'relative',
-      flexShrink: 0,
       overflow: 'hidden',
-      background: '#111',
+      background: `linear-gradient(160deg, hsl(${hue},35%,6%) 0%, hsl(${(hue + 80) % 360},35%,12%) 100%)`,
     }}>
-      {/* Background artwork */}
-      {artwork ? (
-        <div style={{
-          position: 'absolute', inset: 0,
-          backgroundImage: `url(${artwork})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          filter: 'blur(40px) brightness(0.35) saturate(1.4)',
-          transform: 'scale(1.1)',
-        }} />
-      ) : (
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: `linear-gradient(160deg, hsl(${hue},35%,8%) 0%, hsl(${(hue+80)%360},35%,14%) 100%)`,
-        }} />
+
+      {/* Blurred background artwork */}
+      {showImage && (
+        <img
+          src={artwork}
+          alt=""
+          onError={() => setImgError(true)}
+          style={{
+            position: 'absolute', inset: 0,
+            width: '100%', height: '100%',
+            objectFit: 'cover',
+            filter: 'blur(48px) brightness(0.3) saturate(1.6)',
+            transform: 'scale(1.15)',
+            pointerEvents: 'none',
+          }}
+        />
       )}
 
-      {/* Artwork as centered image */}
-      {artwork && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%',
-          transform: 'translate(-50%, -65%)',
-          width: 220, height: 220,
-          borderRadius: 16,
-          backgroundImage: `url(${artwork})`,
-          backgroundSize: 'cover',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
-          opacity: isActive ? 1 : 0.7,
-          transition: 'opacity 0.4s',
-          zIndex: 2,
-        }} />
-      )}
-
-      {/* Bottom gradient */}
+      {/* Dark overlay — always present */}
       <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        height: '65%',
-        background: 'linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.7) 50%, transparent 100%)',
-        zIndex: 3,
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 30%, rgba(0,0,0,0.6) 60%, rgba(0,0,0,0.95) 100%)',
+        pointerEvents: 'none',
+        zIndex: 1,
       }} />
 
-      {/* Top gradient (for status bar area) */}
+      {/* Centred album art — only occupies the middle zone */}
       <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0,
-        height: 80,
-        background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)',
-        zIndex: 3,
-      }} />
-
-      {/* Top bar */}
-      <div style={{
-        position: 'absolute', top: 40, left: 0, right: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 10, padding: '0 20px',
+        position: 'absolute',
+        top: '50%', left: '50%',
+        transform: 'translate(-50%, -58%)',
+        zIndex: 2,
+        pointerEvents: 'none',
       }}>
-        <Link href="/" style={{
-          color: 'rgba(255,255,255,0.9)',
-          fontSize: 18, fontWeight: 800, letterSpacing: '-0.03em',
-        }}>
-          sub<span style={{ color: '#ff5500' }}>freq</span>
-        </Link>
+        {showImage ? (
+          <img
+            src={artwork}
+            alt={`${review.track.artist} — ${review.track.title}`}
+            onError={() => setImgError(true)}
+            style={{
+              width: 200, height: 200,
+              borderRadius: 16,
+              objectFit: 'cover',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.8)',
+              display: 'block',
+              opacity: isActive ? 1 : 0.7,
+              transition: 'opacity 0.4s',
+            }}
+          />
+        ) : (
+          /* Fallback art — coloured square with initials */
+          <div style={{
+            width: 200, height: 200,
+            borderRadius: 16,
+            background: `linear-gradient(135deg, hsl(${hue},45%,18%), hsl(${(hue + 90) % 360},45%,28%))`,
+            boxShadow: '0 24px 64px rgba(0,0,0,0.8)',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}>
+            <span style={{ fontSize: 48 }}>♫</span>
+            <span style={{
+              fontSize: 12, fontWeight: 700, textAlign: 'center', padding: '0 12px',
+              color: 'rgba(255,255,255,0.7)', lineHeight: 1.4,
+            }}>
+              {review.track.artist}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Side actions */}
+      {/* ── SIDE ACTIONS ─────────────────────────────────────── */}
       <div style={{
-        position: 'absolute', right: 14, bottom: 120,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22,
+        position: 'absolute',
+        right: 12,
+        bottom: 180,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20,
         zIndex: 10,
       }}>
         {/* Reviewer avatar */}
-        <div style={{ position: 'relative', marginBottom: 4 }}>
+        <div style={{ position: 'relative' }}>
           <div style={{
             width: 44, height: 44, borderRadius: '50%',
-            background: review.reviewer.avatar_url
-              ? `url(${review.reviewer.avatar_url}) center/cover`
-              : `linear-gradient(135deg, hsl(${hueFromStr(review.reviewer.username)},50%,20%), hsl(${(hueFromStr(review.reviewer.username)+60)%360},50%,28%))`,
-            border: '2px solid #fff',
+            background: `linear-gradient(135deg,
+              hsl(${reviewerHue},50%,18%),
+              hsl(${(reviewerHue + 60) % 360},50%,26%))`,
+            border: '2px solid rgba(255,255,255,0.9)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, fontWeight: 700,
-            color: `hsl(${hueFromStr(review.reviewer.username)},70%,75%)`,
+            fontSize: 17, fontWeight: 800,
+            color: `hsl(${reviewerHue},70%,75%)`,
           }}>
-            {!review.reviewer.avatar_url && review.reviewer.username[0].toUpperCase()}
+            {review.reviewer.username[0].toUpperCase()}
           </div>
           <div style={{
             position: 'absolute', bottom: -8, left: '50%', transform: 'translateX(-50%)',
             width: 20, height: 20, borderRadius: '50%',
             background: '#ff5500',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 12, color: '#fff', fontWeight: 900,
+            fontSize: 13, color: '#fff', fontWeight: 900, lineHeight: 1,
           }}>+</div>
         </div>
 
         {/* Upvote */}
         <button onClick={handleUpvote} style={{
-          background: 'none', border: 'none', cursor: 'pointer',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+          background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
           color: upvoted ? '#ff5500' : '#fff',
-          transition: 'color 0.15s, transform 0.1s',
-          transform: upvoted ? 'scale(1.15)' : 'scale(1)',
+          transition: 'color 0.15s',
+          transform: upvoted ? 'scale(1.1)' : 'scale(1)',
         }}>
-          <span style={{ fontSize: 28, lineHeight: 1 }}>▲</span>
-          <span style={{ fontSize: 12, fontWeight: 700 }}>{upvotes >= 1000 ? `${(upvotes/1000).toFixed(1)}k` : upvotes}</span>
+          <span style={{ fontSize: 30, lineHeight: 1 }}>▲</span>
+          <span style={{ fontSize: 12, fontWeight: 700 }}>
+            {upvotes >= 1000 ? `${(upvotes / 1000).toFixed(1)}k` : upvotes}
+          </span>
         </button>
 
-        {/* Comments */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 26, lineHeight: 1 }}>💬</span>
+        {/* Comment */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+          <span style={{ fontSize: 27, lineHeight: 1 }}>💬</span>
           <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{review.comment_count}</span>
         </div>
 
         {/* Share */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 24, lineHeight: 1 }}>🔗</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+          <span style={{ fontSize: 25, lineHeight: 1 }}>🔗</span>
         </div>
 
-        {/* Genre disc */}
+        {/* Spinning disc */}
         <div style={{
-          width: 44, height: 44, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #1a1a1a, #333)',
-          border: '2px solid rgba(255,255,255,0.15)',
+          width: 42, height: 42, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #1c1c1c, #3a3a3a)',
+          border: '3px solid rgba(255,255,255,0.12)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 20,
-          animation: isActive ? 'spin 4s linear infinite' : 'none',
-        }}>
-          ♫
-        </div>
+          fontSize: 18,
+          animation: isActive ? 'spin 5s linear infinite' : 'none',
+        }}>♫</div>
       </div>
 
-      {/* Bottom content */}
+      {/* ── BOTTOM CONTENT ───────────────────────────────────── */}
       <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 72,
-        padding: '0 16px 32px',
+        position: 'absolute',
+        bottom: 0, left: 0, right: 64,
+        padding: '0 16px 28px',
         zIndex: 10,
       }}>
-        {/* Reviewer */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        {/* Reviewer + time */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+        }}>
           <Link href={`/profile/${review.reviewer.username}`} style={{
             fontSize: 15, fontWeight: 700, color: '#fff',
           }}>
             @{review.reviewer.username}
           </Link>
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>· {timeAgo(review.created_at)}</span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+            · {timeAgo(review.created_at)}
+          </span>
         </div>
 
-        {/* Track */}
+        {/* Track bar */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          background: 'rgba(255,255,255,0.08)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: 10, padding: '8px 12px',
-          marginBottom: 10, border: '1px solid rgba(255,255,255,0.1)',
+          background: 'rgba(255,255,255,0.07)',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+          borderRadius: 10, padding: '7px 11px',
+          marginBottom: 10,
+          border: '1px solid rgba(255,255,255,0.08)',
         }}>
-          <span style={{ fontSize: 16, color: '#ff5500', flexShrink: 0 }}>♫</span>
+          <span style={{ fontSize: 15, color: '#ff5500', flexShrink: 0 }}>♫</span>
           <span style={{
-            fontSize: 12, fontWeight: 600, flex: 1,
+            fontSize: 12, fontWeight: 600, flex: 1, color: 'rgba(255,255,255,0.9)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {review.track.artist} — {review.track.title}
@@ -236,26 +263,32 @@ function ReviewSlide({ review, isActive }: { review: Review; isActive: boolean }
           {review.cue_seconds != null && (
             <span style={{
               fontSize: 11, fontWeight: 700, color: '#ff5500',
-              background: 'rgba(255,85,0,0.15)', padding: '2px 7px',
-              borderRadius: 100, flexShrink: 0,
-            }}>⚡{formatCue(review.cue_seconds)}</span>
+              background: 'rgba(255,85,0,0.15)',
+              padding: '2px 8px', borderRadius: 100, flexShrink: 0,
+            }}>
+              ⚡{formatCue(review.cue_seconds)}
+            </span>
           )}
         </div>
 
-        {/* Review body */}
+        {/* Review body — tap to expand */}
         <p
           onClick={() => setBodyExpanded(v => !v)}
           style={{
-            fontSize: 13, color: 'rgba(255,255,255,0.88)', lineHeight: 1.6,
-            marginBottom: 12, cursor: 'pointer',
-            display: '-webkit-box',
-            WebkitLineClamp: bodyExpanded ? undefined : 3,
-            WebkitBoxOrient: 'vertical',
-            overflow: bodyExpanded ? 'visible' : 'hidden',
+            fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6,
+            marginBottom: 12, cursor: 'pointer', userSelect: 'none',
+            ...(bodyExpanded ? {} : {
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }),
           } as React.CSSProperties}
         >
           {review.body}
-          {!bodyExpanded && <span style={{ color: 'rgba(255,255,255,0.4)' }}> more</span>}
+          {!bodyExpanded && (
+            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12 }}> … more</span>
+          )}
         </p>
 
         {/* SoundCloud CTA */}
@@ -266,9 +299,8 @@ function ReviewSlide({ review, isActive }: { review: Review; isActive: boolean }
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             background: '#ff5500', color: '#fff',
-            padding: '11px 0', borderRadius: 12,
-            fontSize: 13, fontWeight: 800, letterSpacing: '0.03em',
-            textDecoration: 'none',
+            padding: '11px', borderRadius: 12,
+            fontSize: 13, fontWeight: 800, letterSpacing: '0.04em',
           }}
         >
           ▶ LISTEN ON SOUNDCLOUD
@@ -282,12 +314,13 @@ function ReviewSlide({ review, isActive }: { review: Review; isActive: boolean }
   );
 }
 
+/* ─── Main feed page ────────────────────────────────────────────────────────── */
 export default function FeedPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const [genre, setGenre] = useState<string | null>(null);
-  const [feedType, setFeedType] = useState<'trending' | 'genre'>('trending');
+  const [showGenrePicker, setShowGenrePicker] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -302,7 +335,7 @@ export default function FeedPage() {
       const data = await res.json();
       setReviews(data.reviews ?? []);
       setActiveIndex(0);
-      containerRef.current?.scrollTo({ top: 0 });
+      containerRef.current?.scrollTo({ top: 0, behavior: 'instant' });
     } catch {
       setReviews([]);
     } finally {
@@ -312,9 +345,9 @@ export default function FeedPage() {
 
   useEffect(() => { loadFeed('trending'); }, [loadFeed]);
 
-  // Track active slide via IntersectionObserver
+  // Track active slide
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || reviews.length === 0) return;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -330,61 +363,93 @@ export default function FeedPage() {
     return () => observer.disconnect();
   }, [reviews]);
 
-  const GENRES = ['Techno', 'Electronic', 'Drum & Bass', 'Ambient', 'Hip-Hop', 'Footwork'];
-
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative', background: '#000' }}>
-      {/* Genre tabs */}
+    <div style={{ width: '100%', height: '100%', position: 'relative', background: '#000', overflow: 'hidden' }}>
+
+      {/* ── HEADER: single row, no overlap ──────────────────── */}
+      {/* Sits ABOVE the scroll content, inside the phone frame */}
       <div style={{
-        position: 'absolute', top: 44, left: 0, right: 0,
-        display: 'flex', gap: 0,
-        justifyContent: 'center',
-        zIndex: 20, padding: '0 60px',
+        position: 'absolute',
+        top: 0, left: 0, right: 0,
+        height: 88,  /* notch (34) + status gap (10) + tab row (44) */
+        zIndex: 30,
+        pointerEvents: 'none',
       }}>
-        <button
-          onClick={() => { setFeedType('trending'); setGenre(null); loadFeed('trending'); }}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: feedType === 'trending' && !genre ? '#fff' : 'rgba(255,255,255,0.45)',
-            fontWeight: feedType === 'trending' && !genre ? 700 : 500,
-            fontSize: 14, padding: '4px 12px',
-            borderBottom: feedType === 'trending' && !genre ? '2px solid #fff' : '2px solid transparent',
-          }}
-        >
-          Trending
-        </button>
-        <button
-          onClick={() => {
-            // cycle through genres
-            const next = GENRES[(GENRES.indexOf(genre ?? '') + 1) % GENRES.length];
-            setFeedType('genre'); setGenre(next); loadFeed('genre', next);
-          }}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: feedType === 'genre' ? '#fff' : 'rgba(255,255,255,0.45)',
-            fontWeight: feedType === 'genre' ? 700 : 500,
-            fontSize: 14, padding: '4px 12px',
-            borderBottom: feedType === 'genre' ? '2px solid #ff5500' : '2px solid transparent',
-          }}
-        >
-          {genre ?? 'Genres'}
-        </button>
+        {/* Tab row — below the notch */}
+        <div style={{
+          position: 'absolute',
+          top: 44,   /* below notch (34px) + small gap */
+          left: 0, right: 0,
+          height: 44,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: 4,
+          pointerEvents: 'all',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)',
+        }}>
+          {/* Logo */}
+          <Link href="/" style={{
+            fontSize: 17, fontWeight: 900, letterSpacing: '-0.03em',
+            color: '#fff', position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
+          }}>
+            sub<span style={{ color: '#ff5500' }}>freq</span>
+          </Link>
+
+          {/* Trending tab */}
+          <button
+            onClick={() => {
+              setGenre(null); setShowGenrePicker(false);
+              loadFeed('trending');
+            }}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: !genre ? '#fff' : 'rgba(255,255,255,0.45)',
+              fontWeight: !genre ? 700 : 500,
+              fontSize: 14, padding: '0 10px',
+              borderBottom: `2px solid ${!genre ? '#fff' : 'transparent'}`,
+              lineHeight: '42px',
+            }}
+          >
+            Trending
+          </button>
+
+          {/* Genre tab */}
+          <button
+            onClick={() => setShowGenrePicker(v => !v)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: genre ? '#ff5500' : 'rgba(255,255,255,0.45)',
+              fontWeight: genre ? 700 : 500,
+              fontSize: 14, padding: '0 10px',
+              borderBottom: `2px solid ${genre ? '#ff5500' : 'transparent'}`,
+              lineHeight: '42px',
+            }}
+          >
+            {genre ?? 'Genres ▾'}
+          </button>
+        </div>
       </div>
 
-      {/* Genre picker drawer */}
-      {feedType === 'genre' && (
+      {/* Genre picker — slides down from below the header */}
+      {showGenrePicker && (
         <div style={{
-          position: 'absolute', top: 80, left: 12, right: 12,
-          display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center',
-          zIndex: 20,
+          position: 'absolute',
+          top: 88, left: 0, right: 0,
+          padding: '10px 12px',
+          display: 'flex', gap: 7, flexWrap: 'wrap', justifyContent: 'center',
+          zIndex: 29,
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
         }}>
           {GENRES.map(g => (
-            <button key={g} onClick={() => { setGenre(g); loadFeed('genre', g); }} style={{
-              background: genre === g ? '#ff5500' : 'rgba(0,0,0,0.6)',
-              border: `1px solid ${genre === g ? '#ff5500' : 'rgba(255,255,255,0.2)'}`,
-              backdropFilter: 'blur(10px)',
-              color: '#fff', fontSize: 11, fontWeight: 600,
-              padding: '5px 12px', borderRadius: 100, cursor: 'pointer',
+            <button key={g} onClick={() => {
+              setGenre(g); setShowGenrePicker(false); loadFeed('genre', g);
+            }} style={{
+              background: genre === g ? '#ff5500' : 'rgba(255,255,255,0.08)',
+              border: `1px solid ${genre === g ? '#ff5500' : 'rgba(255,255,255,0.15)'}`,
+              color: '#fff', fontSize: 12, fontWeight: 600,
+              padding: '6px 14px', borderRadius: 100, cursor: 'pointer',
             }}>
               {g}
             </button>
@@ -392,7 +457,7 @@ export default function FeedPage() {
         </div>
       )}
 
-      {/* Scroll container */}
+      {/* ── SCROLL CONTAINER ─────────────────────────────────── */}
       <div
         ref={containerRef}
         style={{
@@ -400,34 +465,29 @@ export default function FeedPage() {
           overflowY: 'scroll',
           scrollSnapType: 'y mandatory',
           scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
         } as React.CSSProperties}
       >
-        <style>{`
-          div::-webkit-scrollbar { display: none; }
-        `}</style>
+        <style>{`div::-webkit-scrollbar{display:none}`}</style>
 
         {loading ? (
           <div style={{
-            width: '100%', height: '100%',
+            width: '100%', height: '100%', scrollSnapAlign: 'start',
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            color: 'rgba(255,255,255,0.4)', gap: 12,
-            scrollSnapAlign: 'start',
+            color: 'rgba(255,255,255,0.35)', gap: 14,
           }}>
-            <div style={{ fontSize: 48 }}>♫</div>
+            <div style={{ fontSize: 52 }}>♫</div>
             <div style={{ fontSize: 14 }}>Loading...</div>
           </div>
         ) : reviews.length === 0 ? (
           <div style={{
-            width: '100%', height: '100%',
+            width: '100%', height: '100%', scrollSnapAlign: 'start',
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            color: 'rgba(255,255,255,0.4)', gap: 12,
-            scrollSnapAlign: 'start',
+            color: 'rgba(255,255,255,0.35)', gap: 14,
           }}>
-            <div style={{ fontSize: 48 }}>♫</div>
-            <div style={{ fontSize: 14 }}>No reviews yet for {genre ?? 'this feed'}</div>
+            <div style={{ fontSize: 52 }}>♫</div>
+            <div style={{ fontSize: 14 }}>No reviews for {genre ?? 'this feed'}</div>
           </div>
         ) : (
           reviews.map((review, i) => (
@@ -442,17 +502,19 @@ export default function FeedPage() {
         )}
       </div>
 
-      {/* Progress dots */}
+      {/* ── PROGRESS DOTS ────────────────────────────────────── */}
       {reviews.length > 1 && (
         <div style={{
-          position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+          position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)',
           display: 'flex', flexDirection: 'column', gap: 4, zIndex: 20,
+          pointerEvents: 'none',
         }}>
-          {reviews.slice(0, 10).map((_, i) => (
+          {reviews.slice(0, 12).map((_, i) => (
             <div key={i} style={{
-              width: 3, height: i === activeIndex ? 16 : 5,
+              width: 3,
+              height: i === activeIndex ? 18 : 5,
               borderRadius: 2,
-              background: i === activeIndex ? '#fff' : 'rgba(255,255,255,0.25)',
+              background: i === activeIndex ? '#fff' : 'rgba(255,255,255,0.2)',
               transition: 'height 0.2s, background 0.2s',
             }} />
           ))}
